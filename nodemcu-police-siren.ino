@@ -6,8 +6,12 @@
 #define WIFI_RETRY_DELAY 500
 #define MAX_WIFI_INIT_RETRY 50
 
-const char* wifi_ssid = "";
-const char* wifi_passwd = "";
+const char* wifi_ssid = "YOUR_WIFI_SSD_HERE";
+const char* wifi_passwd = "YOUR_WIFI_PASSWORD_HERE";
+
+int alerting = 0; // 0 = off, 1 = on
+
+uint8_t pin_led = 16; //  LED PIN
 
 ESP8266WebServer http_rest_server(HTTP_REST_PORT);
 
@@ -27,36 +31,60 @@ int init_wifi() {
     return WiFi.status(); // return the WiFi connection status
 }
 
+void toggleLED() {
+  String post_body = http_rest_server.arg("plain");
+  Serial.println("Got POST body:");
+  Serial.println(post_body);
+  
+  alerting = !alerting;
+  Serial.println("LED new status");
+  Serial.println(alerting);
+  http_rest_server.send(200, "text/html", "LED new status: " + String(alerting));
+}
+
 void config_rest_server_routing() {
     http_rest_server.on("/", HTTP_GET, []() {
         http_rest_server.send(200, "text/html",
             "Welcome to the ESP8266 REST Web Server");
     });
 //    http_rest_server.on("/leds", HTTP_GET, get_leds);
-//    http_rest_server.on("/leds", HTTP_POST, post_put_leds);
+    http_rest_server.on("/leds", HTTP_POST, toggleLED);
 //    http_rest_server.on("/leds", HTTP_PUT, post_put_leds);
 }
 
 void setup() {
+
   // put your setup code here, to run once:
-    Serial.begin(115200);
+  
+  pinMode(pin_led, OUTPUT);
 
-    if (init_wifi() == WL_CONNECTED) {
-        Serial.print("Connetted to ");
-        Serial.print(wifi_ssid);
-        Serial.print("--- IP: ");
-        Serial.println(WiFi.localIP());
-    } else {
-        Serial.print("Error connecting to: ");
-        Serial.println(wifi_ssid);
-    }
+  Serial.begin(115200);
 
-    config_rest_server_routing();
-    http_rest_server.begin();
-    Serial.println("HTTP REST Server Started");
+  if (init_wifi() == WL_CONNECTED) {
+      Serial.print("Connetted to ");
+      Serial.print(wifi_ssid);
+      Serial.print("--- IP: ");
+      Serial.println(WiFi.localIP());
+  } else {
+      Serial.print("Error connecting to: ");
+      Serial.println(wifi_ssid);
+  }
+
+  config_rest_server_routing();
+  http_rest_server.begin();
+  Serial.println("HTTP REST Server Started");
+
+  digitalWrite(pin_led, HIGH);  
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
   http_rest_server.handleClient();
+
+  if (alerting == 1) {
+    digitalWrite(pin_led, LOW);
+  } else {
+    digitalWrite(pin_led, HIGH);
+  }
+  delay(300);
 }
